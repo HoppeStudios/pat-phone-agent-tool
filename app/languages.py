@@ -11,6 +11,7 @@ import re
 LANGUAGES = {
     "en": {"title": "English", "native": "English", "letters": re.compile(r"[A-Za-z]")},
     "ru": {"title": "Russian", "native": "Русский", "letters": re.compile(r"[А-Яа-яЁё]")},
+    "cs": {"title": "Czech", "native": "Čeština", "letters": re.compile(r"[A-Za-zÁČĎÉĚÍŇÓŘŠŤÚŮÝŽáčďéěíňóřšťúůýž]")},
 }
 FALLBACK = "en"
 

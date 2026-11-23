@@ -41,16 +41,10 @@ AGENT_PROMPT = ("The owner typed this into Pat's sticky note. Do it with the pat
                 "missing in one short sentence.")
 
 
-def agent_command(claude, text):
-    """The note's agent gets the pat-phone tools and nothing else. With Claude Code's own tools it could read files in
-    Pat's folder without asking, contacts/book.json with the real numbers among them; with every MCP server it would
-    also get your claude.ai connectors, such as Gmail."""
-    python = os.path.join(os.path.dirname(sys.executable), "python.exe")  # the note may run under pythonw; the server needs a console Python
-    server = {"mcpServers": {"pat-phone": {"type": "stdio", "command": python, "args": [os.path.join(HERE, "phone_mcp.py")]}}}
-    return [claude, "-p", text, "--model", AGENT_MODEL, "--tools", "", "--strict-mcp-config", "--mcp-config", json.dumps(server),
-            "--allowedTools", AGENT_TOOLS, "--system-prompt", AGENT_PROMPT]
-    # --system-prompt replaces Claude Code's own, about coding and files, which this agent has no use for. Claude Code
-    # still adds the pat-phone server's guide and today's date. Its first request went from 20.5k to 13.4k characters.
+def agent_command(codex, text):
+    """A dedicated Codex dispatcher exposes only this instance's phone MCP tools."""
+    return [sys.executable, os.path.join(HERE, "app", "codex_dispatch.py"), "--codex", codex, "--", text]
+
 
 
 if sys.stdout is None:  # pythonw has no console
@@ -521,7 +515,7 @@ class Desk:
                                   creationflags=subprocess.CREATE_NO_WINDOW, cwd=HERE)
             reply = done.stdout.strip() or done.stderr.strip()
         except (OSError, SystemExit) as error:
-            reply = f"Couldn't start Claude: {error}"
+            reply = f"Couldn't start Codex: {error}"
         choose_next_style(self.folder, "")  # if the agent didn't call, the flag isn't for some later call
         with self.lock:
             # If a call happened, the note has its report on screen already, and the agent's words are only a repeat of it.
@@ -543,7 +537,7 @@ class Desk:
         self.ai_requested = False
         if not asked:  # only the Claude kept ready while it rang, ending because Me was chosen or the ringing stopped
             return
-        reason = "Claude couldn't start."
+        reason = "Codex couldn't start."
         try:
             with open(self.result_file, encoding="utf-8") as f:
                 reason = json.load(f).get("reason") or reason

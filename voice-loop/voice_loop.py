@@ -36,11 +36,16 @@ SYSTEM_PROMPTS = {
           "двенадцати слов: твой ответ будут читать вслух. Без списков и разметки. Числа, сокращения и "
           "иностранные названия пиши словами кириллицей.",
 }
-ERROR_PHRASES = {"en": "Sorry, I could not reach Claude.", "ru": "Извините, не могу связаться с Клодом."}
+SYSTEM_PROMPTS["cs"] = ("Jsi hlasový asistent. Mluv pouze česky, přirozeně a stručně, jednou nebo dvěma krátkými větami. "
+    "Bez seznamů a formátování. Text se bude číst nahlas. Čísla, ceny a data vyslovuj českými slovy. "
+    "Zachovej přesné údaje a značky v hranatých závorkách, které vyžadují pokyny hovoru.")
+ERROR_PHRASES = {"en": "Sorry, I could not reach Codex.", "ru": "Извините, не могу связаться с помощником.", "cs": "Omlouvám se, asistent teď není dostupný."}
 TTS_LANGUAGE = "english_18m_2026-10"
 TTS_VOICE = "alba"
 EN_STT_MODEL = "nemo-parakeet-tdt-0.6b-v2"
 RU_VOICES = {"irina": "ru_RU-irina-medium", "ruslan": "ru_RU-ruslan-medium"}
+CS_TTS_VOICE = "jirka"
+CS_STT_MODEL = "nemo-parakeet-tdt-0.6b-v3"
 RU_TTS_VOICE = "irina"
 RU_STT_MODEL = "gigaam-v3-rnnt"  # same as Pat's
 KEYS = {"rctrl": 0xA3, "lctrl": 0xA2, "f8": 0x77, "f9": 0x78, "f10": 0x79}
@@ -69,111 +74,15 @@ def only_one_copy():
         sys.exit("The voice loop is already running in another window. Press Ctrl+C there first.")
 
 
-def find_claude():
-    override = os.environ.get("VOICE_LOOP_CLAUDE")
-    if override:
-        return override
-    on_path = shutil.which("claude")
-    if on_path:
-        return on_path
-    pattern = os.path.expandvars(r"%LOCALAPPDATA%\Claude-Data\*\claude-code\*\*\claude.exe")
+from codex_brain import CodexBrain, find_codex
 
-    def version(path):
-        parts = path.split(os.sep)[-3].split(".")
-        return [int(p) for p in parts if p.isdigit()]
-
-    found = sorted(glob.glob(pattern), key=version)
-    if not found:
-        sys.exit("Could not find claude.exe. Set VOICE_LOOP_CLAUDE to its full path.")
-    return found[-1]
+# Compatibility name for callers and existing extensions. It resolves Codex only.
+find_claude = find_codex
 
 
-class Brain:
-    """One claude process kept open, because starting a new one costs about a second per turn."""
-
-    def __init__(self, language="en", cli=None, system_prompt=None, model=MODEL):
-        self.cli = cli or find_claude()
-        self.model = model
-        self.system_prompt = system_prompt or SYSTEM_PROMPTS[language]
-        self.workdir = os.path.join(tempfile.gettempdir(), "voice_loop")
-        os.makedirs(self.workdir, exist_ok=True)
-        self.proc = None
-        self.lines = None
-        self.noise = collections.deque(maxlen=5)
-        self.start()
-
-    def start(self):
-        # Dropping CLAUDE*/ANTHROPIC* keeps this on your plan login, even if an API key is set somewhere.
-        env = {k: v for k, v in os.environ.items() if not k.upper().startswith(("CLAUDE", "ANTHROPIC"))}
-        env["MAX_THINKING_TOKENS"] = "0"
-        env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
-        args = [
-            self.cli, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
-            "--include-partial-messages", "--model", self.model, "--fallback-model",
-            "claude-haiku-4-5" if self.model == FALLBACK_MODEL else FALLBACK_MODEL,
-            "--tools", "", "--system-prompt", self.system_prompt, "--no-session-persistence",
-            "--strict-mcp-config", "--setting-sources", "", "--disable-slash-commands",
-        ]
-        if self.model == "claude-haiku-5-5":
-            args += ["--effort", "low"]
-        # No window of its own: started from a windowless program such as Pat's note, claude.exe would open a terminal.
-        self.proc = subprocess.Popen(
-            args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            env=env, cwd=self.workdir, text=True, encoding="utf-8", errors="replace", bufsize=1,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-        self.lines = queue.Queue()
-        threading.Thread(target=self._read, args=(self.proc.stdout, self.lines), daemon=True).start()
-
-    def _read(self, stream, lines):
-        for raw in stream:
-            lines.put(raw)
-        lines.put(None)
-
-    def ask(self, text):
-        """Yield the reply's text as it arrives."""
-        if self.proc.poll() is not None:
-            self.start()
-        message = {"type": "user", "session_id": "", "parent_tool_use_id": None,
-                   "message": {"role": "user", "content": text}}
-        self.proc.stdin.write(json.dumps(message) + "\n")
-        self.proc.stdin.flush()
-        while True:
-            raw = self.lines.get()
-            if raw is None:
-                raise RuntimeError("claude stopped: " + " ".join(self.noise))
-            try:
-                event = json.loads(raw)
-            except ValueError:
-                self.noise.append(raw.strip())
-                continue
-            if event.get("type") == "stream_event":
-                delta = event.get("event", {}).get("delta", {})
-                if delta.get("type") == "text_delta":
-                    yield delta.get("text", "")
-            elif event.get("type") == "result":
-                if event.get("is_error"):
-                    raise RuntimeError(str(event.get("result")))
-                return
-
-    def warm_up(self):
-        for _ in self.ask("Reply with just the word ready."):
-            pass
-
-    def interrupt(self):
-        """Stops the reply being written; the waiting ask raises at once. The conversation, and its cache, stay."""
-        if self.proc and self.proc.poll() is None:
-            self.proc.stdin.write(json.dumps({"type": "control_request", "request_id": f"stop-{time.monotonic_ns()}",
-                                              "request": {"subtype": "interrupt"}}) + "\n")
-            self.proc.stdin.flush()
-
-    def close(self):
-        if self.proc and self.proc.poll() is None:
-            self.proc.stdin.close()
-            try:
-                self.proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.proc.kill()
+class Brain(CodexBrain):
+    def __init__(self, language="en", cli=None, system_prompt=None, model=None, **kwargs):
+        super().__init__(language, cli=cli, system_prompt=system_prompt or SYSTEM_PROMPTS[language], model=model, **kwargs)
 
 
 def open_speaker(rate):
@@ -214,8 +123,11 @@ class PiperVoice:
 
     def __init__(self, voice=RU_TTS_VOICE):
         import piper
-        voice = RU_VOICES.get(voice, voice)
+        voice = {**RU_VOICES, "jirka": "cs_CZ-jirka-medium"}.get(voice, voice)
         folder = os.path.join(HERE, "models", "piper")
+        if voice == "cs_CZ-jirka-medium":
+            from czech_assets import ensure_assets
+            folder = str(ensure_assets("piper"))
         path = os.path.join(folder, f"{voice}.onnx")
         if not os.path.exists(path):
             os.makedirs(folder, exist_ok=True)
@@ -344,7 +256,11 @@ class BatchEar(Mic):
 
     def __init__(self, model=RU_STT_MODEL, mic=True):
         import onnx_asr
-        self.model = onnx_asr.load_model(model, quantization="int8")
+        path = None
+        if model == CS_STT_MODEL:
+            from czech_assets import ensure_assets
+            path = ensure_assets("asr")
+        self.model = onnx_asr.load_model(model, path, quantization="int8")
         self.model.recognize(np.zeros(MIC_RATE, dtype=np.float32), sample_rate=MIC_RATE)
         self.audio = []
         super().__init__(mic)
@@ -442,13 +358,13 @@ def main():
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     logging.disable(logging.INFO)
     print("Loading speech models...", flush=True)
-    if args.lang == "ru":
-        mouth = Mouth(PiperVoice(args.voice or RU_TTS_VOICE))
-        ear = BatchEar(args.stt or RU_STT_MODEL)
+    if args.lang in ("ru", "cs"):
+        mouth = Mouth(PiperVoice(args.voice or (CS_TTS_VOICE if args.lang == "cs" else RU_TTS_VOICE)))
+        ear = BatchEar(args.stt or (CS_STT_MODEL if args.lang == "cs" else RU_STT_MODEL))
     else:
         mouth = Mouth(PocketVoice(args.tts, args.voice or TTS_VOICE))
         ear = BatchEar(args.stt or EN_STT_MODEL)
-    print("Starting Claude...", flush=True)
+    print("Starting Codex...", flush=True)
     brain = Brain(args.lang)
     brain.warm_up()
 

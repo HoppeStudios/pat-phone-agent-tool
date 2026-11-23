@@ -300,8 +300,8 @@ class ModelConstruction(unittest.TestCase):
         with mock.patch.dict("sys.modules", {"pocket_tts": types.SimpleNamespace(TTSModel=Model)}), mock.patch.object(pat, "BatchEar") as ears, mock.patch("voice_loop.PiperVoice", return_value=russian), mock.patch.object(pat, "SpeechDetector", return_value=types.SimpleNamespace(session=object())):
             engine = SpeechEngine(lambda _: None)
         self.assertEqual(Model.loads, 1)
-        self.assertEqual(len(engine.voices), len(pat.ENGLISH_VOICES) + 2)
-        self.assertEqual(ears.call_count, 2)
+        self.assertEqual(len(engine.voices), len(pat.ENGLISH_VOICES) + 3)
+        self.assertEqual(ears.call_count, 3)
         self.assertTrue(all(call.kwargs["mic"] is False for call in ears.call_args_list))
         self.assertEqual(len({id(voice.model) for (lang, _), voice in engine.voices.items() if lang == "en"}), 1)
 

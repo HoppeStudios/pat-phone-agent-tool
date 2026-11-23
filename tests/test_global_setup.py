@@ -21,6 +21,9 @@ class ProfileCase(unittest.TestCase):
         self.environment = mock.patch.dict(os.environ, {"PAT_PROFILE_PATH": str(self.folder / "profile.json")})
         self.environment.start()
         self.addCleanup(self.environment.stop)
+        display_language = mock.patch("user_profile.system_language", return_value="en")
+        display_language.start()
+        self.addCleanup(display_language.stop)
         self.original_dates = real_dates._time_zone, real_dates._date_format
         real_dates._time_zone = real_dates._date_format = None
         self.addCleanup(self.restore_dates)
@@ -253,7 +256,7 @@ class OwnerNameLanguages(ProfileCase):
             while "Writing" in table.status.text() and time.time() < deadline:
                 app.processEvents()
                 time.sleep(0.01)
-        self.assertEqual([table.current, table.edit.text(), table.language.count()], ["en", "Maya", 2])  # one row, a dropdown
+        self.assertEqual([table.current, table.edit.text(), table.language.count()], ["en", "Maya", 3])  # one row, three languages
         table.fill()
         settle()
         self.assertEqual(table.edit.text(), "Maya")  # still showing the owner's own language

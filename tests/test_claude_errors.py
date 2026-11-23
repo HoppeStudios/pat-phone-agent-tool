@@ -18,7 +18,7 @@ class PlainReasonTest(unittest.TestCase):
 
     def test_a_reset_time_is_kept(self):
         self.assertEqual(plain_reason(STARTING + "You've hit your limit · resets 5pm (Asia/Tashkent)"),
-                         "Your Claude plan's limit is used up. It resets 5pm (Asia/Tashkent).")
+                         "Your Codex plan's limit is used up. It resets 5pm (Asia/Tashkent).")
 
     def test_only_claudes_errors_are_changed(self):
         bluetooth = "iphonecall did not start: authentication failed on the network adapter"

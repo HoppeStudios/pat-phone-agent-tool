@@ -1,0 +1,48 @@
+name: Verify Codex and Czech support
+
+on:
+  push:
+    branches: [codex-czech-setup]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-and-helper:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONUTF8: '1'
+      PAT_RUN_LIVE_TESTS: '0'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_GENERATE_ASPNET_CERTIFICATE: 'false'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+        with:
+          dotnet-version: '10.0.404'
+      - name: Install locked wheels
+        run: python -m pip install --require-hashes --only-binary=:all: --quiet -r requirements.lock
+      - name: Test without phone calls or model downloads
+        run: python -m unittest tests.test_codex_backend tests.test_czech tests.test_czech_assets tests.test_default_language tests.test_phone_mcp tests.test_supervision tests.test_real_dates tests.test_global_setup
+      - name: Parse installer scripts
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          foreach ($file in @('setup-codex.ps1') + @(Get-ChildItem scripts -Filter '*.ps1' | ForEach-Object FullName)) {
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count) { throw "$file has syntax errors: $errors" }
+          }
+      - name: Build helper without installation
+        run: dotnet publish iphone-hfp/iphonecall/iphonecall.csproj -c Release -r win-x64 --self-contained true --source https://api.nuget.org/v3/index.json --output "$env:RUNNER_TEMP/phone-helper" -p:DebugType=None -p:DebugSymbols=false -p:NuGetAudit=true
+      - name: Synthetic helper self-test
+        run: python -c "import os,subprocess; subprocess.run([os.path.join(os.environ['RUNNER_TEMP'],'phone-helper','iphonecall.exe'),'self-test'],check=True)"

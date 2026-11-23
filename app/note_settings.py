@@ -7,7 +7,7 @@ SETTINGS_NAME = "note-settings.json"
 
 
 class NoteSettings:
-    DEFAULTS = {"zoom": 1.0, "language": "en", "unknown": "ask", "voice_en": "charles", "voice_ru": "irina",
+    DEFAULTS = {"zoom": 1.0, "language": "en", "unknown": "ask", "voice_en": "charles", "voice_ru": "irina", "voice_cs": "jirka",
                 "noise_cancellation": False}
 
     def __init__(self, folder=os.path.join(HERE, "calls")):
@@ -27,7 +27,7 @@ class NoteSettings:
             raise AttributeError(name) from None
 
     def voice_for(self, language):
-        return self.values["voice_ru" if language == "ru" else "voice_en"]
+        return self.values[f"voice_{language}"]
 
     def change(self, name, value):
         self.values[name] = value

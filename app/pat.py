@@ -48,7 +48,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # Names and calls ma
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # the repository: this file is in app/
 sys.path.insert(0, os.path.join(HERE, "voice-loop"))
 from voice_loop import (BatchEar, Brain, MIC_RATE, Mouth, PiperVoice, PocketVoice, RU_TTS_VOICE,  # noqa: E402
-                        SYSTEM_PROMPTS, Splitter, TTS_LANGUAGE, TTS_VOICE)
+                        SYSTEM_PROMPTS, Splitter, TTS_LANGUAGE, TTS_VOICE, CS_STT_MODEL, CS_TTS_VOICE)
 
 # The fewest word errors on phone audio that still answer in about 0.2 s on a CPU.
 RU_STT_MODEL = "gigaam-v3-rnnt"
@@ -83,7 +83,7 @@ NUDGE_SECONDS = 8  # dead air this long during the task, and Claude checks the p
 MAX_NUDGES = 2  # in a row, after which NOBODY_THERE_SECONDS decides
 MAX_WORDLESS_REPLIES = 2  # in a row, so line noise can't keep Claude talking
 CONFIRMATION_END = re.compile(r"\b(?:is that (?:right|correct|okay)|right|correct|(?:это |вс[её] )?(?:верно|правильно)|так)\s*\?\s*$", re.I)
-CONFIRMATION_CUES = set("right correct correctly okay ok confirm верно правильно так подтвердите подтверждаете".split())
+CONFIRMATION_CUES = set("správně souhlasí potvrzujete potvrďte right correct correctly okay ok confirm верно правильно так подтвердите подтверждаете".split())
 CONFIRMATION_WORDS = CONFIRMATION_CUES | set(
     "can could would you please did i hear get got have is this that it does sound understand understood heard do so am understanding everything "
     "я вас вы меня ли услышал услышала понял поняла понимаю это всё все да мне пожалуйста".split())
@@ -96,23 +96,42 @@ OPENINGS = {
                "ru": "Здравствуйте, я виртуальный ассистент. Мой пользователь — {owner_ru}. {owner_ru} может слышать этот разговор."},
 }
 # Said before the owner comes on the line, so the other person knows a person has joined.
-TAKING_OVER = {"en": "One moment, I'm passing you to {owner}.", "ru": "Одну секунду, передаю трубку. С вами будет говорить {owner_ru}."}
+OPENINGS["dial"]["cs"] = "Dobrý den, jsem Pat, asistent s umělou inteligencí. Zastupuji osobu jménem {owner}. Tato osoba může hovor poslouchat."
+OPENINGS["answer"]["cs"] = OPENINGS["dial"]["cs"] + " Jak vám mohu pomoci?"
+
+
+def call_opening(action, language, owner, owner_ru, assistant_name=""):
+    """Keep the assistant's chosen name separate from the human owner's name."""
+    if not assistant_name:
+        return OPENINGS[action][language].format(owner=owner, owner_ru=owner_ru)
+    phrases = {
+        "cs": "Dobrý den, jsem {assistant}, asistent s umělou inteligencí. Volám jménem svého uživatele, který může hovor poslouchat.",
+        "en": "Hello, I'm {assistant}, an AI assistant acting for my user, who may hear this conversation.",
+        "ru": "Здравствуйте, я {assistant}, виртуальный ассистент. Я представляю своего пользователя, который может слышать этот разговор.",
+    }
+    phrase = phrases[language].format(assistant=assistant_name)
+    if action == "answer":
+        phrase += {"cs": " Jak vám mohu pomoci?", "en": " How can I help you?", "ru": " Чем могу помочь?"}[language]
+    return phrase
+
+
+TAKING_OVER = {"cs": "Okamžik prosím, předávám vám hovor.", "en": "One moment, I'm passing you to {owner}.", "ru": "Одну секунду, передаю трубку. С вами будет говорить {owner_ru}."}
 # When nobody comes to the phone during the identity check.
-NOBODY_CAME = {"en": "I couldn't reach them. We will call again. Goodbye.", "ru": "Не дождался ответа. Мы перезвоним. До свидания."}
+NOBODY_CAME = {"cs": "Nepodařilo se mi spojit s požadovanou osobou. Děkuji, na shledanou.", "en": "I couldn't reach them. We will call again. Goodbye.", "ru": "Не дождался ответа. Мы перезвоним. До свидания."}
 # No call lasts longer, so nobody can keep Claude on the line by talking over every goodbye (Aziz, 9 Nov).
 MAX_CALL_MINUTES = 5
 # Said in Claude's voice when Pat itself ends the call. Pat hangs up after it, even if they talk over it.
-ENDING = {"en": "Unfortunately I have to finish the call{reason}. Goodbye.", "ru": "К сожалению, мне придётся закончить звонок{reason}. До свидания."}
-ENDING_REASONS = {"time limit": {"en": ", as it has run too long", "ru": ", так как он слишком затянулся"}}
+ENDING = {"cs": "Bohužel musím hovor ukončit{reason}. Na shledanou.", "en": "Unfortunately I have to finish the call{reason}. Goodbye.", "ru": "К сожалению, мне придётся закончить звонок{reason}. До свидания."}
+ENDING_REASONS = {"time limit": {"cs": ", protože už trvá příliš dlouho", "en": ", as it has run too long", "ru": ", так как он слишком затянулся"}}
 DEFAULT_ANSWER_GOAL = "Find out who is calling and why, and offer to pass on a message."
 # Told to Haiku on a call Pat answered, once Pat knows who called.
 KNOWN_CALLER = ("You now know who they are. Don't ask their name again, and don't ask for their full name, surname or phone number "
                 "unless your task asks for it.")
-WARM_UP = {"en": "The call is about to connect. Reply with just the word ready.",
+WARM_UP = {"cs": "Hovor se brzy spojí. Odpověz pouze slovem připraven.", "en": "The call is about to connect. Reply with just the word ready.",
            "ru": "Звонок сейчас начнётся. Ответь одним словом: готов."}
 # Said when Sonnet changes what Haiku will say. Varied, so it doesn't sound like a machine stalling.
 # No "sorry": after a correction the call should carry on as if nothing went wrong.
-STALLS = {"en": ["One moment.", "Just a moment, please.", "One second.", "Hold on a second, please."],
+STALLS = {"cs": ["Okamžik prosím.", "Chviličku prosím.", "Hned to ověřím."], "en": ["One moment.", "Just a moment, please.", "One second.", "Hold on a second, please."],
           "ru": ["Одну секунду.", "Секундочку.", "Минутку, пожалуйста.", "Одну минуту."]}
 # Added to Sonnet's note after a correction. On the 7 Nov call Haiku began its corrected line with "Прошу прощения, я ошибся".
 CARRY_ON = ("Carry on naturally from there: no sorry or apology, even if the note's wording has one; don't say you made a mistake, "
@@ -834,11 +853,16 @@ class Conversation:
 
     def _cut_speech(self):
         """Stops Claude, noting how much of a reply still under way the person probably heard."""
+        generating = self.generating
         if self.generating or not self.mouth.idle():
             heard = self.mouth.heard_so_far()
             self.pending_cut = heard
             self.transcript.add("Claude", f"(cut off, heard only: {heard})" if heard else HEARD_NOTHING)
         self.mouth.cancel()
+        if generating:
+            interrupt = getattr(self.brain, "interrupt", None)
+            if interrupt is not None:
+                interrupt()
 
     def _cut_note(self):
         """A note for Haiku about its last reply, or "" if it was heard in full."""
@@ -1326,7 +1350,7 @@ def load_speech(language, voice):
     from speech_service import available, RemoteEar, RemoteVoice
     status = available()
     if status:
-        selected = voice or (RU_TTS_VOICE if language == "ru" else DEFAULT_ENGLISH_VOICE)
+        selected = voice or (CS_TTS_VOICE if language == "cs" else RU_TTS_VOICE if language == "ru" else DEFAULT_ENGLISH_VOICE)
         ear = RemoteEar(status, language)
         try:
             speaker = RemoteVoice(status, language, selected)
@@ -1337,6 +1361,8 @@ def load_speech(language, voice):
         if language == "en":
             mouth.slow_rate = ENGLISH_VOICES.get(selected, {}).get("chars_per_second", SLOW_CHARS_PER_SECOND)
         return ear, mouth
+    if language == "cs":
+        return BatchEar(CS_STT_MODEL, mic=False), TrackingMouth(PiperVoice(voice or CS_TTS_VOICE), play=False)
     if language == "ru":
         return BatchEar(RU_STT_MODEL, mic=False), TrackingMouth(PiperVoice(voice or RU_TTS_VOICE), play=False)
     voice = voice or DEFAULT_ENGLISH_VOICE
@@ -1348,12 +1374,12 @@ def load_speech(language, voice):
 def prepare_models():
     """Downloads now what a first call would otherwise stop to download."""
     SpeechDetector()
-    for language, voices in (("ru", ("irina", "ruslan")), ("en", tuple(ENGLISH_VOICES))):
+    for language, voices in (("cs", ("jirka",)), ("ru", ("irina", "ruslan")), ("en", tuple(ENGLISH_VOICES))):
         for voice in voices:  # any of them can be chosen from the note's menu, and a call shouldn't stop to download one
             print(f"Loading {language} speech ({voice})...", flush=True)
             load_speech(language, voice)
     print("Speech models are ready.")
-    say_watson()
+    # Model preparation is silent and never changes audio devices.
 
 
 def say_watson(eggs=None, make_mouth=None):
@@ -1395,7 +1421,7 @@ def tell_caller_name(brain, name, nonce):
 
 
 def start_brain(args, brief, opening, nonce, notes):
-    print("Starting Claude...", flush=True)
+    print("Starting Codex...", flush=True)
     prompt = brief.haiku_prompt(SYSTEM_PROMPTS[brief.language], opening, args.owner, nonce, notes)
     try:
         brain = Brain(brief.language, system_prompt=prompt)
@@ -1623,7 +1649,7 @@ def main():
     parser.add_argument("--confidence", choices=["confirmed", "guess", "unknown"], default="guess",
                         help="how sure you are the number is theirs")
     parser.add_argument("--lang", choices=sorted(SYSTEM_PROMPTS), default="en", help="call language (default: English)")
-    parser.add_argument("--voice", default=None, help=f"Russian: irina or ruslan. English: {', '.join(ENGLISH_VOICES)}")
+    parser.add_argument("--voice", default=None, help=f"Czech: jirka. Russian: irina or ruslan. English: {', '.join(ENGLISH_VOICES)}")
     parser.add_argument("--owner", default=None, help="override the name saved in Pat's settings for this call")
     parser.add_argument("--owner-ru", default=None, help="optional spoken Russian version of the owner's name")
     parser.add_argument("--time-zone", help="IANA time zone for this call, such as Europe/London")
@@ -1704,7 +1730,8 @@ def main():
     go = threading.Event()
     cancelled = threading.Event()
     live.handlers.update({"go": go.set, "cancel": cancelled.set})
-    opening = OPENINGS[args.action][brief.language].format(owner=args.owner, owner_ru=args.owner_ru)
+    opening = call_opening(args.action, brief.language, args.owner, args.owner_ru,
+                           profile.values.get("assistant_name", ""))
     if brief.has_target():
         opening = f"{opening} {brief.check_question()}"
     nonce = secrets.token_hex(4)  # the person can't say this, so they can't pose as the supervisor
