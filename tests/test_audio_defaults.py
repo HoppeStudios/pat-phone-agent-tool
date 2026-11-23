@@ -179,6 +179,8 @@ class OtherLaptops(unittest.TestCase):
 
     def test_a_device_that_cannot_be_described_is_skipped(self):
         audio = WindowsAudio()
+        if len(audio._endpoints_from_api(RENDER)) < 2:
+            self.skipTest("This hardware test requires at least two render endpoints")
         real = audio._describe
         calls = []
 

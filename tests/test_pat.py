@@ -339,6 +339,7 @@ class FakeLine:
         self.ended = threading.Event()
 
 
+@unittest.skipUnless(os.environ.get("PAT_RUN_LIVE_TESTS") == "1", "Live model tests require explicit opt-in")
 class Rehearsal(unittest.TestCase):
     """A whole conversation, with a recording as the caller and no sound played."""
 

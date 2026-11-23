@@ -95,9 +95,9 @@ class SpeechEngine:
         self.pat = pat
         self.ears = {}
         self.voices = {}
-        self.asr_locks = {language: threading.Lock() for language in ("en", "ru")}
+        self.asr_locks = {language: threading.Lock() for language in ("en", "ru", "cs")}
         self.tts_lock = threading.Lock()
-        for language, model in (("en", pat.EN_STT_MODEL), ("ru", pat.RU_STT_MODEL)):
+        for language, model in (("en", pat.EN_STT_MODEL), ("ru", pat.RU_STT_MODEL), ("cs", pat.CS_STT_MODEL)):
             progress(f"Loading {language} recognition")
             self.ears[language] = pat.BatchEar(model, mic=False)
         english_model = None
@@ -114,6 +114,11 @@ class SpeechEngine:
             self.voices[("ru", voice)] = speaker
             for _ in speaker.stream(speaker.warm_text, threading.Event()):
                 pass
+        progress("Preparing Czech voice jirka")
+        speaker = PiperVoice("jirka")
+        self.voices[("cs", "jirka")] = speaker
+        for _ in speaker.stream("Připraveno.", threading.Event()):
+            pass
         progress("Loading speech detection")
         self.vad_session = pat.SpeechDetector(use_service=False).session
 
@@ -215,7 +220,7 @@ class SpeechServer:
             if kind not in ("asr", "voice", "vad"):
                 raise ValueError("Unknown speech resource.")
             language = request.get("language", "en")
-            if language not in ("en", "ru"):
+            if language not in ("en", "ru", "cs"):
                 raise ValueError("Unsupported speech language.")
             speaker = self.engine.speaker(language, request["voice"]) if kind == "voice" else None
             detector = self.engine.detector() if kind == "vad" else None

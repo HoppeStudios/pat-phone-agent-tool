@@ -20,7 +20,7 @@ if ($ShortcutsOnly) {
     Set-PatShortcuts -Root $root -Startup $Startup -Rehearse:$Rehearse
     return
 }
-$pythonVersion = '3.13'
+$pythonVersion = '3.12'
 $dotnetMajor = '10'
 $vbcableZip = 'https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip'
 $vbcablePage = 'https://vb-audio.com/Cable/'
@@ -83,13 +83,10 @@ function Find-Python {
     return $null
 }
 
-function Find-Claude {
-    if ($env:VOICE_LOOP_CLAUDE) { return $env:VOICE_LOOP_CLAUDE }
-    $onPath = Get-Command claude -ErrorAction SilentlyContinue
+function Find-Codex {
+    if ($env:VOICE_LOOP_CODEX) { return $env:VOICE_LOOP_CODEX }
+    $onPath = Get-Command codex -ErrorAction SilentlyContinue
     if ($onPath) { return $onPath.Source }
-    $found = Get-ChildItem "$env:LOCALAPPDATA\Claude-Data\*\claude-code\*\*\claude.exe" -ErrorAction SilentlyContinue |
-        Sort-Object { try { [version]$_.Directory.Parent.Name } catch { [version]'0.0' } } | Select-Object -Last 1
-    if ($found) { return $found.FullName }
     return $null
 }
 
@@ -271,7 +268,7 @@ if ($Rehearse) {
     }
     # About 1.6 GB the first time. Its progress shows, so a long download doesn't look like a stuck setup.
     Write-Host '   Installing Pat''s Python packages: about 1.6 GB the first time, often 10-30 minutes. Leave this window open.'
-    & $python -m pip install --disable-pip-version-check -r "$root\requirements.txt"
+    & $python -m pip install --disable-pip-version-check --only-binary=:all: --require-hashes -r "$root\requirements.lock"
     Check 'Installing Python packages'
     & $python --version
 }
@@ -314,24 +311,18 @@ if ($Rehearse) {
     & "$root\iphone-hfp\iphonecall\build.ps1"
 }
 
-Step 'Claude Code'
-$claude = Find-Claude
+Step 'Codex'
+$codex = Find-Codex
 if ($Rehearse) {
-    Would 'check Claude Code is logged in, and register the phone tool for every folder'
-} elseif (-not $claude) {
-    Todo 'Install the Claude Code app and log in, then run this again.'
+    Would 'check Codex login and register pat-phone with Codex'
+} elseif (-not $codex) {
+    Todo 'Install Codex CLI, run codex login, then run this again.'
 } else {
-    if ((Asks-Quietly $claude @('auth', 'status')) -notmatch '"loggedIn":\s*true') { Todo 'Open the Claude Code app and log in.' } else { 'Logged in.' }
-    $saved = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    foreach ($name in 'pat-phone', 'cicero-phone') {  # its old name too. On a first run there's nothing to remove
-        & $claude mcp remove --scope user $name *> $null
-    }
-    $ErrorActionPreference = $saved
-    $global:LASTEXITCODE = 0
-    & $claude mcp add --scope user pat-phone -- $python "$root\phone_mcp.py"
-    Check 'Registering the phone tool'
-    'Phone tool registered for every folder. Chats open before now keep using the old one until restarted.'
+    & $codex login status
+    if ($LASTEXITCODE -ne 0) { Todo 'Run codex login to sign in with ChatGPT.' }
+    & $codex mcp add pat-phone --env PYTHONUTF8=1 -- $python "$root\phone_mcp.py"
+    Check 'Registering the phone tool in Codex'
+    'Phone tool registered. Existing Codex chats may need an MCP restart.'
 }
 
 Step 'Audio drivers'

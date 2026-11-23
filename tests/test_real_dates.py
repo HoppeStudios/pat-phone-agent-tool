@@ -2,6 +2,7 @@
 import datetime
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from live_notes import LiveNotes
 from observer import Observer
@@ -48,7 +49,11 @@ class Swapping(unittest.TestCase):
 
     def test_reading_a_timestamp(self):
         self.assertEqual(day_of("2026-11-03 13:42"), TODAY)
-        self.assertEqual(day_of("nonsense"), datetime.date.today())
+        # The profile's local date can differ from the PC's date near midnight.
+        profile_now = datetime.datetime(2026, 11, 4, 0, 30,
+                                        tzinfo=datetime.timezone(datetime.timedelta(hours=5)))
+        with patch("real_dates.current_time", return_value=profile_now):
+            self.assertEqual(day_of("nonsense"), datetime.date(2026, 11, 4))
 
 
 class WhereTheyAreKept(unittest.TestCase):

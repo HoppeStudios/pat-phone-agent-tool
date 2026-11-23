@@ -6,11 +6,11 @@ from zoneinfo import ZoneInfo
 
 # Longest first, so "the day after tomorrow" isn't read as "tomorrow".
 RELATIVE = (
-    (r"(?:the\s+)?day\s+after\s+tomorrow(?:'s)?|послезавтра(?:шн\w+)?", 2),
-    (r"(?:the\s+)?day\s+before\s+yesterday(?:'s)?|позавчера(?:шн\w+)?", -2),
-    (r"tomorrow(?:'s)?|завтра(?:шн\w+)?", 1),
-    (r"yesterday(?:'s)?|вчера(?:шн\w+)?", -1),
-    (r"today(?:'s)?|tonight(?:'s)?|сегодня(?:шн\w+)?", 0),
+    (r"(?:the\s+)?day\s+after\s+tomorrow(?:'s)?|pozítří|послезавтра(?:шн\w+)?", 2),
+    (r"(?:the\s+)?day\s+before\s+yesterday(?:'s)?|předevčírem|позавчера(?:шн\w+)?", -2),
+    (r"tomorrow(?:'s)?|zítra|завтра(?:шн\w+)?", 1),
+    (r"yesterday(?:'s)?|včera|вчера(?:шн\w+)?", -1),
+    (r"today(?:'s)?|tonight(?:'s)?|dnes(?: večer)?|сегодня(?:шн\w+)?", 0),
 )
 ISO_DATE = re.compile(r"\b(20\d\d)-(\d\d)-(\d\d)\b")
 WRITE_REAL_DATES = ("Write full calendar dates in the format named in the date table. Name the time zone with appointment times. Never write tomorrow, today, yesterday, next Friday or anything else "
@@ -18,7 +18,7 @@ WRITE_REAL_DATES = ("Write full calendar dates in the format named in the date t
 _SAY_DATES = ("The date format above is for writing. When you say a date aloud, say it the way people do: the weekday, then the day and month in words, "
               "such as {example}. Say the year only if it isn't this year, and never read a date out in the written format, with its dashes or slashes.")
 # Each call gets only its own language's example.
-SAY_DATES = {"en": _SAY_DATES.format(example='"Friday, the sixth of November"'),
+SAY_DATES = {"cs": _SAY_DATES.format(example='"v pátek šestého listopadu"'),"en": _SAY_DATES.format(example='"Friday, the sixth of November"'),
              "ru": _SAY_DATES.format(example='"в пятницу, шестого ноября"')}
 
 

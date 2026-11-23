@@ -175,7 +175,7 @@ static class Pairing
         else Tell("no_phones", "No phone is paired.");
 
         // 2. Phone Link blocks pairing while it runs.
-        EndPhoneLink();
+        RequirePhoneLinkClosed();
 
         // 3–4. Find the phone nearby and pair; after a refusal, the phone still holds an old pairing.
         DeviceInformation? info = null;
@@ -277,18 +277,14 @@ static class Pairing
         return true;
     }
 
-    // Ends Phone Link only if it's running; says nothing otherwise.
-    static void EndPhoneLink()
+    // Never end another app's active call as a side effect of pairing.
+    static void RequirePhoneLinkClosed()
     {
         foreach (var p in Process.GetProcessesByName(PhoneLinkProcess))
         {
-            try
-            {
-                p.Kill();
-                p.WaitForExit(5000);
-                Tell("ended_phone_link", $"ended    : Phone Link ({PhoneLinkProcess}), so it doesn't block the pairing");
-            }
-            catch (Exception e) { Tell("ended_phone_link", $"ended    : couldn't end Phone Link: {e.Message.Trim()}"); }
+            using (p)
+                if (!p.HasExited)
+                    throw new InvalidOperationException("Phone Link is running. Finish any active call and close Phone Link, then retry pairing. Pat will not close it for you.");
         }
     }
 

@@ -21,7 +21,7 @@ ENGLISH_VOICES = {
 }
 DEFAULT_ENGLISH_VOICE = "charles"
 HEARD_NOTHING = "(cut off, heard nothing of this reply)"
-BARE_ANSWERS = {"да", "ага", "угу", "нет", "ну", "так", "хорошо", "ладно", "конечно", "yes", "yeah", "yep", "no", "nope", "ok", "okay", "uh", "huh", "mm", "hmm", "sure", "right"}
+BARE_ANSWERS = {"да", "ага", "угу", "нет", "ну", "так", "хорошо", "ладно", "конечно", "yes", "yeah", "yep", "no", "nope", "ok", "okay", "uh", "huh", "mm", "hmm", "sure", "right", "ano", "jo", "jasně", "jistě", "ne", "dobře", "prosím", "hm"}
 MAX_BRIEF_CHARS = 3000  # the whole brief goes in Haiku's prompt, and a long prompt slows every reply
 ASK_MARK = "[ASK]"
 END_MARK = "[END]"
@@ -253,8 +253,8 @@ class CallBrief:
             value = getattr(brief, name)
             if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
                 raise ValueError(f"{name} must be a list of short strings")
-        if brief.language not in ("ru", "en"):
-            raise ValueError("language must be ru or en; the speech models support nothing else")
+        if brief.language not in ("ru", "en", "cs"):
+            raise ValueError("language must be cs, en or ru")
         if brief.has_target() and brief.confidence not in CONFIDENCE_LINES:
             raise ValueError(f"confidence must be one of {sorted(CONFIDENCE_LINES)}")
         if brief.who_can_answer not in ("", "only_this_person", "anyone_there"):
@@ -286,6 +286,8 @@ class CallBrief:
         who = self.name.strip() or self.company.strip()
         if self.confirm_question.strip():
             return self.confirm_question.strip()
+        if self.language == "cs":
+            return f"Dobrý den, dovolal jsem se prosím do {who}?" if not self.name.strip() else f"Mluvím prosím s osobou jménem {who}?"
         return f"Скажите, пожалуйста, это {who}?" if self.language == "ru" else f"Could you tell me, please, is this {who}?"
 
     def limits(self):

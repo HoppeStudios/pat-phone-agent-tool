@@ -34,7 +34,7 @@ HOVER_GRACE_MS = 2000
 DRAG_MS = 10
 LEFT_BUTTON = 0x01
 ZOOMS = (0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0)
-LANGUAGES = (("English", "en"), ("Russian", "ru"))
+LANGUAGES = (("Čeština", "cs"), ("English", "en"), ("Russian", "ru"))
 FOR_UNKNOWN = (("Show the note's options", "ask"), ("Always AI", "ai"), ("Always me", "me"))
 RUSSIAN_VOICES = (("Irina (female)", "irina"), ("Ruslan (male)", "ruslan"))
 NOISE_CANCELLATION = (("Without (default)", False), ("With", True))
@@ -559,6 +559,7 @@ def _settings_menu(menu, window, options):
     menu.addAction(QAction("Set up the phone for Pat's calls...", menu, triggered=window.open_pairing))
     for title, choices, name in (("Incoming calls speak", LANGUAGES, "language"), ("Unknown numbers", FOR_UNKNOWN, "unknown"),
                                  ("English voice", english_voices(), "voice_en"), ("Russian voice", RUSSIAN_VOICES, "voice_ru"),
+                                 ("Czech voice", (("Jiří", "jirka"),), "voice_cs"),
                                  ("Noise cancellation", NOISE_CANCELLATION, "noise_cancellation")):
         window.submenus[title] = _choices(menu, title, choices, getattr(settings, name), lambda value, name=name: settings.change(name, value))
     menu.addAction(QAction("Contacts...", menu, triggered=contacts.bring_up))

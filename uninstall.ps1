@@ -20,13 +20,10 @@ function Would($text) { Write-Host "   Would: $text" -ForegroundColor DarkGray }
 function Todo($text) { [void]$todo.Add($text); Write-Host "   Left for you: $text" -ForegroundColor Yellow }
 
 # The same checks as setup.ps1's, so both agree on what is installed.
-function Find-Claude {
-    if ($env:VOICE_LOOP_CLAUDE) { return $env:VOICE_LOOP_CLAUDE }
-    $onPath = Get-Command claude -ErrorAction SilentlyContinue
+function Find-Codex {
+    if ($env:VOICE_LOOP_CODEX) { return $env:VOICE_LOOP_CODEX }
+    $onPath = Get-Command codex -ErrorAction SilentlyContinue
     if ($onPath) { return $onPath.Source }
-    $found = Get-ChildItem "$env:LOCALAPPDATA\Claude-Data\*\claude-code\*\*\claude.exe" -ErrorAction SilentlyContinue |
-        Sort-Object { try { [version]$_.Directory.Parent.Name } catch { [version]'0.0' } } | Select-Object -Last 1
-    if ($found) { return $found.FullName }
     return $null
 }
 
@@ -79,19 +76,18 @@ if ($Rehearse) {
     Todo 'Check the default speaker and microphone in Settings > System > Sound: Pat''s Python is gone, so it could not.'
 }
 
-Step 'Phone tool for Claude Code'
-$claude = Find-Claude
+Step 'Phone tool for Codex'
+$codex = Find-Codex
 if ($Rehearse) {
-    Would 'remove the pat-phone tool from Claude Code'
-} elseif (-not $claude) {
-    'Claude Code is not installed, so there is no phone tool to remove.'
-} else {
-    $saved = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    foreach ($name in 'pat-phone', 'cicero-phone') { & $claude mcp remove --scope user $name *> $null }
-    $ErrorActionPreference = $saved
-    $global:LASTEXITCODE = 0
-    'Removed. Chats open now keep it until they are restarted.'
+    Would 'remove pat-phone from Codex only if it points to this installation'
+} elseif ($codex) {
+    $raw = & $codex mcp get pat-phone --json 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        $entry = ($raw -join "`n") | ConvertFrom-Json
+        if ($entry.transport.args -contains "$root\phone_mcp.py") {
+            & $codex mcp remove pat-phone
+        } else { 'Preserved a pat-phone registration belonging to another installation.' }
+    }
 }
 
 Step 'Shortcuts'

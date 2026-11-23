@@ -232,10 +232,11 @@ def _on_off(value):
 
 def laptop_state(run=subprocess.run, headsets=None, registry=_registry):
     """The Windows settings and helpers behind every setup problem so far. Reads only. A check that can't tell says unknown."""
-    def ask(command, seconds=30):
+    def ask(command, seconds=30, include_stderr=False):
         try:
             done = run(command, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=seconds)
-            return done.stdout.strip()
+            extra = done.stderr if include_stderr and isinstance(done.stderr, str) else ""
+            return (done.stdout + "\n" + extra).strip()
         except (OSError, subprocess.TimeoutExpired):
             return None
     lines = [
@@ -261,10 +262,10 @@ def laptop_state(run=subprocess.run, headsets=None, registry=_registry):
     phones = ask(["iphonecall", "phones"], 60)
     lines += ["Paired phones:", *[f"  {line}" for line in phones.splitlines()]] if phones else ["Paired phones: the phone helper didn't answer"]
     claude = _claude_path()
-    status = ask([claude, "auth", "status"]) if claude else None
+    status = ask([claude, "login", "status"], include_stderr=True) if claude else None
     # Only whether it's logged in: the full answer has the account's email address.
-    lines.append("Claude Code: " + ("not found" if not claude else "unknown" if status is None else
-                                    "logged in" if re.search(r'"loggedIn":\s*true', status) else "not logged in"))
+    lines.append("Codex: " + ("not found" if not claude else "unknown" if status is None else
+                                    "logged in" if "Logged in" in status else "not logged in"))
     return lines
 
 
@@ -316,7 +317,7 @@ def _claude_path():
     try:
         from voice_loop import find_claude
         return find_claude()
-    except (ImportError, SystemExit):  # find_claude exits when there's no claude.exe
+    except (ImportError, SystemExit, RuntimeError):  # find_claude exits when there's no claude.exe
         return None
 
 

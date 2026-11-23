@@ -775,7 +775,7 @@ class IdentityFlow(unittest.TestCase):
     def test_nobody_coming_to_the_phone_gets_a_goodbye(self):
         call, transcript = checked_call(FakeBrain())
         call.opening_done.set()
-        call.frames = iter([pat.np.zeros(pat.FRAME, dtype=pat.np.float32)] * 3)
+        call.frames = (time.sleep(0.01) or pat.np.zeros(pat.FRAME, dtype=pat.np.float32) for _ in range(3))
         call.nobody_seconds = 0
         call.turn_lock.acquire()  # the opening has nothing to do in this test
         original = pat.SpeechDetector
@@ -791,7 +791,7 @@ class IdentityFlow(unittest.TestCase):
     def test_the_time_limit_ends_with_a_fixed_goodbye_that_nothing_cuts(self):
         call, transcript = conversation(FakeBrain())
         call.opening_done.set()
-        call.frames = iter([pat.np.zeros(pat.FRAME, dtype=pat.np.float32)] * 3)
+        call.frames = (time.sleep(0.01) or pat.np.zeros(pat.FRAME, dtype=pat.np.float32) for _ in range(3))
         call.max_seconds = 0
         call.turn_lock.acquire()  # the opening has nothing to do in this test
         original = pat.SpeechDetector

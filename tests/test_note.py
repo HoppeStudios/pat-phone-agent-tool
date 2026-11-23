@@ -220,15 +220,12 @@ class AgentReply(DeskCase):
         self.assertEqual(self.desk.state()["notice"], "Couldn't set up the laptop's audio")
 
     def test_the_agent_gets_only_the_phone_tools(self):
-        args = note.agent_command("claude", "call Alex")
-        self.assertEqual(args[args.index("--tools") + 1], "")  # no Read or Grep, so it can't open contacts/book.json
-        self.assertIn("--strict-mcp-config", args)  # and none of the claude.ai connectors
-        servers = json.loads(args[args.index("--mcp-config") + 1])["mcpServers"]
-        self.assertEqual(list(servers), ["pat-phone"])
-        self.assertTrue(servers["pat-phone"]["args"][0].endswith("phone_mcp.py"))
-        self.assertTrue(servers["pat-phone"]["command"].endswith("python.exe"))
-        self.assertEqual(args[args.index("--system-prompt") + 1], note.AGENT_PROMPT)  # Pat's text, not Claude Code's coding rules
-        self.assertNotIn("--append-system-prompt", args)
+        args = note.agent_command("codex.exe", "call Alex")
+        self.assertEqual(args[0], sys.executable)
+        self.assertTrue(args[1].endswith("codex_dispatch.py"))
+        self.assertEqual(args[2:], ["--codex", "codex.exe", "--", "call Alex"])
+        from codex_dispatch import ALLOWED
+        self.assertEqual(ALLOWED, {"place_call", "get_call", "contact_notes", "list_contacts"})
 
 
 class Ringing(DeskCase):
@@ -364,10 +361,10 @@ class AnsweringWithAI(DeskCase):
         self.ring()
         self.desk.answer_ai()
         with open(self.desk.result_file, "w", encoding="utf-8") as f:
-            json.dump({"status": "failed", "reason": "Claude couldn't start: Invalid API key · Please run /login"}, f)
+            json.dump({"status": "failed", "reason": "Codex couldn't start: authentication required"}, f)
         self.calls[0].finished = 1
         self.desk.ai_since -= 10
-        self.assertIn("type /login", self.desk.state()["notice"])
+        self.assertIn("codex login", self.desk.state()["notice"])
 
     def test_the_claude_kept_ready_while_it_rang_ends_quietly_when_nobody_asked_for_ai(self):
         """Its exit after Me, or after the ringing stops, isn't a failure, so its reason never shows."""

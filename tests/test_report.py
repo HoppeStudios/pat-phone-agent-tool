@@ -147,29 +147,39 @@ class LaptopSettings(unittest.TestCase):
 
     def test_each_setting_is_reported_and_the_claude_email_never_is(self):
         lines = self.run_with({"Get-AppxPackage": "1.0.0.0", "tasklist": "PhoneExperienceHost.exe  4242 Console",
-                               "phones": "phone   connected\niPhone   yes", "auth": '{"loggedIn": true, "email": "someone@example.com"}'})
+                               "phones": "phone   connected\niPhone   yes", "login": 'Logged in using ChatGPT someone@example.com'})
         text = "\n".join(lines)
         for expected in ("Developer Mode: on", "Allow this PC to access your mobile devices: on", "Phone helper: installed, version 1.0.0.0",
-                         "Phone Link running: yes", "Wireless Buds", "  iPhone   yes", "Claude Code: logged in"):
+                         "Phone Link running: yes", "Wireless Buds", "  iPhone   yes", "Codex: logged in"):
             self.assertIn(expected, text)
         self.assertNotIn("someone@example.com", text)
 
+    def test_codex_login_on_stderr_is_reported_without_account_details(self):
+        def run(command, **kwargs):
+            if "login" in command:
+                return mock.Mock(stdout="", stderr="Logged in using ChatGPT someone@example.com")
+            raise OSError("not available")
+        with mock.patch.object(report, "_claude_path", return_value="codex.exe"):
+            text = "\n".join(report.laptop_state(run=run, headsets=lambda: [], registry=lambda *_: None))
+        self.assertIn("Codex: logged in", text)
+        self.assertNotIn("someone@example.com", text)
+
     def test_a_check_that_cannot_tell_says_so_instead_of_failing(self):
-        lines = self.run_with({"Get-AppxPackage": "", "tasklist": OSError("no tasklist"), "auth": '{"loggedIn": false}'},
+        lines = self.run_with({"Get-AppxPackage": "", "tasklist": OSError("no tasklist"), "login": 'Not logged in'},
                               registry=lambda hive, path, name: None)
         text = "\n".join(lines)
         for expected in ("Developer Mode: unknown", "Phone helper: not installed", "Phone Link running: unknown",
-                         "Paired phones: the phone helper didn't answer", "Claude Code: not logged in"):
+                         "Paired phones: the phone helper didn't answer", "Codex: not logged in"):
             self.assertIn(expected, text)
 
     def test_phone_link_details_are_reported(self):
         def registry(hive, path, name):
             return {"State": 2, "PhoneLinkEnabled": 0}.get(name, 1)
-        text = "\n".join(self.run_with({"Get-AppxPackage": "1.26092.119.0", "tasklist": "INFO: No tasks", "auth": "{}"}, registry=registry))
+        text = "\n".join(self.run_with({"Get-AppxPackage": "1.26092.119.0", "tasklist": "INFO: No tasks", "login": "{}"}, registry=registry))
         for expected in ("Phone Link running: no", "Phone Link installed: yes, version 1.26092.119.0",
                          "Phone Link starts at sign-in: on", "Phone Link option on the Mobile devices page: off"):
             self.assertIn(expected, text)
-        text = "\n".join(self.run_with({"Get-AppxPackage": "", "auth": "{}"}, registry=lambda hive, path, name: None))
+        text = "\n".join(self.run_with({"Get-AppxPackage": "", "login": "{}"}, registry=lambda hive, path, name: None))
         self.assertIn("Phone Link installed: no", text)
         self.assertIn("Phone Link starts at sign-in: unknown", text)
 
