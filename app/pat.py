@@ -1509,6 +1509,8 @@ def listen_for_keys(line, conversation):
             typed = typed.strip().lower()
             if typed == "h":
                 conversation.stopped.set()
+            elif typed in ("p", "l") and not getattr(line, "supports_handover", True):
+                print("This phone transport does not support call handover.", flush=True)
             elif typed == "p":
                 line.to_phone()
                 conversation.hand_over.set()
@@ -1660,6 +1662,7 @@ def main():
     parser.add_argument("--save-audio", action="store_true",
                         help="keep the other person's audio in calls/. Only with their agreement")
     args = parser.parse_args()
+    profile = UserProfile()
     if args.action == "dial" and not (args.number and (args.brief or args.brief_file)):
         parser.error("dial needs a number and --brief or --brief-file")
     if args.action in ("dial", "answer"):
@@ -1667,7 +1670,6 @@ def main():
         if refusal:
             write_result(args, **refusal)
             sys.exit(refusal["reason"])
-        profile = UserProfile()
         owner_names = profile.names if args.owner in (None, profile.name) else {}  # a different --owner has no saved spellings
         if args.owner_ru:
             owner_names = {**owner_names, "ru": args.owner_ru}
@@ -1689,12 +1691,24 @@ def main():
             write_result(args, status="failed", reason=str(error))
             parser.error(str(error))
 
+    sip = None
+    if profile.values.get("phone_transport", "bluetooth") == "android-sip" and args.action in ("dial", "answer", "check"):
+        from sip_provider import SipConfig, SipLine
+        sip = SipLine(SipConfig.load(profile.values.get("android_sip_config")))
+        refusal = ("Incoming Android SIP answering is disabled." if args.action == "answer" else
+                   "Android SIP outgoing calls are disabled pending the owner's explicit test-call request."
+                   if args.action == "dial" and not sip.config.outbound_enabled else
+                   "Use the note's listen option for Android SIP; --audible is not supported." if args.audible else "")
+        if refusal:
+            write_result(args, status="failed", reason=refusal)
+            sip.close()
+            sys.exit(refusal)
     only_one_copy()
     if args.action == "prepare":
         prepare_models()
         return
     devices = CallDevices(os.path.join(HERE, "calls"))
-    for problem in devices.restore():  # a call that was killed can leave them switched
+    for problem in ([] if sip else devices.restore()):  # a call that was killed can leave them switched
         print(f"Setup: {problem}")
     if args.action == "restore-audio":
         print("Default speaker and microphone are back as they were.")
@@ -1711,14 +1725,21 @@ def main():
         fine, message = check_microphone()
         print(message)
         sys.exit(0 if fine else 1)
-    problems = check_audio_setup(args.audible)
+    problems = sip.check() if sip else check_audio_setup(args.audible)
     for problem in problems:
         print(f"Setup: {problem}")
     if problems:
         write_result(args, status="failed", reason=" ".join(problems))
+        if sip:
+            sip.close()
         sys.exit(1)
     if args.action == "check":
-        print(f"Audio setup is fine. Calls will use: {find_silent_speaker() or 'your default speaker'}.")
+        if sip:
+            print("Android SIP is registered and idle. No call was placed. Outgoing calls " +
+                  ("are enabled." if sip.config.outbound_enabled else "remain disabled pending an explicit test request."))
+            sip.close()
+        else:
+            print(f"Audio setup is fine. Calls will use: {find_silent_speaker() or 'your default speaker'}.")
         return
 
     logging.disable(logging.INFO)
@@ -1737,7 +1758,7 @@ def main():
     nonce = secrets.token_hex(4)  # the person can't say this, so they can't pose as the supervisor
     print("Loading speech models...", flush=True)
     ear, mouth = load_speech(brief.language, args.voice or NoteSettings(calls_folder).voice_for(brief.language))
-    mouth.out = CableOutput(open_cable(mouth.sample_rate))
+    mouth.out = CableOutput(sip.output(mouth.sample_rate) if sip else open_cable(mouth.sample_rate))
     mouth.out.start()
     brain = None
     notes = None
@@ -1757,7 +1778,7 @@ def main():
     print("Connecting to your phone...", flush=True)
     os.makedirs(os.path.join(HERE, "calls"), exist_ok=True)
     phone_log = os.path.join(HERE, "calls", f"phone-{datetime.datetime.now():%Y%m%d-%H%M%S}.log")
-    line = PhoneLine(log_path=phone_log)
+    line = sip or PhoneLine(log_path=phone_log)
     if not line.wait_ready():
         print("\n".join(line.started))
         taken = f"{PhoneLine.TAKEN_MESSAGE} " if line.taken_by_another_app() else ""
@@ -1784,7 +1805,8 @@ def main():
     try:
         if args.action == "dial":
             print(f"Dialing {args.number}. Claude's task: {brief.goal}", flush=True)
-            use_call_devices(devices, args.audible)
+            if not sip:
+                use_call_devices(devices, args.audible)
             line.dial(args.number)
             answered = line.wait_for(["Talking"], seconds=90)
         else:
@@ -1830,8 +1852,9 @@ def main():
             return
         picked_up = time.monotonic()
         time.sleep(AFTER_PICKUP_SECONDS)
-        caller = CallerAudio()
-        print(f"Connected. Hearing through: {caller.name}. Press F9 or type l to take the call on the laptop, p to move it to your phone, h to hang up.", flush=True)
+        caller = sip.caller if sip else CallerAudio()
+        controls = "Type h to hang up. Call handover is not supported." if sip else "Press F9 or type l to take the call on the laptop, p to move it to your phone, h to hang up."
+        print(f"Connected. Hearing through: {caller.name}. {controls}", flush=True)
         transcript = Transcript(key=key)
         transcript.add("Pat", f"task: {brief.text()}")
         transcript.add("Pat", f"hearing through: {caller.name}; call audio: {line.audio}")
@@ -1850,7 +1873,8 @@ def main():
                                     task_message=brief.task_message(args.owner, known) if brief.has_target() else None,
                                     caller_id_name=caller_name)
         listen_for_keys(line, conversation)
-        watch_take_over_key(conversation)
+        if not sip:
+            watch_take_over_key(conversation)
 
         def start_notes():
             nonlocal live_notes, notes_brain
@@ -1874,6 +1898,9 @@ def main():
                 listening = None
 
         def move_to_phone():
+            if sip:
+                live.update(notice="Android SIP does not support call handover.")
+                return
             line.to_phone()
             conversation.hand_over.set()
 
@@ -1882,7 +1909,8 @@ def main():
                              "facts": lambda: live_notes.facts if live_notes else [],
                              "summary": lambda: live_notes.summary if live_notes else ""})
         live.handlers.update({"listen on": lambda: set_listening(True), "listen off": lambda: set_listening(False),
-                              "take-over": conversation.take_over.set, "to-phone": move_to_phone, "hang-up": conversation.stopped.set})
+                              "take-over": (lambda: live.update(notice="Android SIP does not support call handover.")) if sip else conversation.take_over.set,
+                              "to-phone": move_to_phone, "hang-up": conversation.stopped.set})
         status = "done"
         reason = conversation.run()
         set_listening(False)
@@ -1912,8 +1940,8 @@ def main():
             line.hang_up()
             time.sleep(1)
         line.close()
-        switched = os.path.exists(devices.path)  # only a call Pat switched the defaults for
-        for problem in devices.restore():
+        switched = not sip and os.path.exists(devices.path)  # only a call Pat switched the defaults for
+        for problem in ([] if sip else devices.restore()):
             print(f"Setup: {problem}")
         try:  # what was there before can itself be virtual, such as Voicemeeter as the device for calls
             for change in real_defaults() if switched else []:

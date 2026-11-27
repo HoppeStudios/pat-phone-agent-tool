@@ -11,3 +11,7 @@ Developer Mode permits development app registration across Windows. Mobile-devic
 Do not publish a report containing phone numbers, names, Bluetooth addresses, account details, file paths or transcripts. Public GitHub issues are unsuitable for sensitive reports. Use GitHub private vulnerability reporting when it is available, or contact the repository maintainers privately through an agreed channel. Do not send personal information to an unverified address.
 
 Hash verification, signatures, antivirus scans and tests are bounded evidence. They are not a guarantee that software or a future dependency is safe. Phone makers, Windows versions, Bluetooth drivers and model responses can behave differently.
+
+## Optional Android SIP gateway
+
+Shizuku grants the selected helper shell-level Android capabilities; it is a deliberate additional trust boundary. Keep the default outgoing SIM at Refuse, both incoming slots disabled and the client outbound flag false until an exact owner-requested test call. Do not expose AMI or the PCM relay outside loopback. Restrict SIP/RTP to the selected Tailscale peers; never publish runtime secrets, peer addresses or device identifiers. A clean malware scan, registered SIP endpoint or synthetic loopback does not prove complete safety or cellular compatibility. See docs/ANDROID_SIP.md for lifecycle, cleanup and verification limits.

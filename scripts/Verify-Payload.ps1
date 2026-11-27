@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 function Invoke-PatPayloadScan([string]$Path) {
-    $resolved = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path
+    $resolved = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath
     $platform = Join-Path $env:ProgramData 'Microsoft\Windows Defender\Platform'
     $scanner = Get-ChildItem -LiteralPath $platform -Directory -ErrorAction SilentlyContinue |
         Where-Object {$_.Name -match '^\d'} | Sort-Object Name -Descending |

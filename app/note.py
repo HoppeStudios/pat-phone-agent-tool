@@ -62,6 +62,18 @@ from phone_numbers import unambiguous_legacy_keys  # noqa: E402
 from user_profile import UserProfile  # noqa: E402
 
 
+class OutgoingOnlyLine:
+    """The note observes worker reports; it never opens another SIP or Bluetooth line."""
+    in_call = False
+    audio = None
+
+    def close(self):
+        pass
+
+    def __getattr__(self, name):
+        raise RuntimeError("Android SIP supports outgoing agent calls only; handover is unavailable.")
+
+
 class CallRules:
     """Who takes each number's calls without asking. A number with no rule follows `decide`."""
 
@@ -731,7 +743,10 @@ class LateDesk:
         self.control.resume()
 
     def start_pairing(self, flow_factory=None):
-        """The set-up steps, inside the note. One at a time: pressing the button again leaves the open one alone."""
+        """Show pairing only for the Bluetooth transport."""
+        if self.desk and isinstance(self.desk.line, OutgoingOnlyLine):
+            self.notice = "Android SIP uses its configured Tailscale gateway. Bluetooth pairing is not used."
+            return
         if self.pairing and self.pairing.active:
             return
         from pairing_flow import PairingFlow
@@ -821,7 +836,12 @@ def main():
         return late.desk
 
     os.makedirs(CALLS, exist_ok=True)
-    threading.Thread(target=watch_line, args=(make_line, desk_for, late.on_problem, late.control), daemon=True).start()
+    if UserProfile().values.get("phone_transport") == "android-sip":
+        late.desk = Desk(OutgoingOnlyLine(), start_call, always=rules, settings=settings,
+                         private=private, speech_ready=speech.is_ready)
+        late.notice = "Android SIP: outgoing agent calls only; incoming calls and handover are unavailable."
+    else:
+        threading.Thread(target=watch_line, args=(make_line, desk_for, late.on_problem, late.control), daemon=True).start()
     try:
         show(late, on_quit=lambda: late.desk and late.desk.quit(), options=types.SimpleNamespace(settings=settings, rules=rules, private=private, eggs=EasterEggs()))
     finally:

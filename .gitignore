@@ -6,6 +6,8 @@ calls/
 contacts/
 reports/
 setup-logs/
+android-sip-runtime/
+runtime-private.json
 
 # Machine-specific
 .mcp.json

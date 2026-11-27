@@ -2,7 +2,9 @@
 
 Tato verze používá Codex přihlášený přes existující účet ChatGPT. Claude Code není potřeba. Pro češtinu používá místní rozpoznávání Parakeet TDT v3 a hlas Piper Jiří.
 
-## Co je potřeba
+Pro experimentální připojení Androidu přes síť použijte [návod Android SIP / Tailscale](ANDROID_SIP.md). Následující požadavky se týkají původní varianty přes Bluetooth.
+
+## Co je potřeba pro Bluetooth
 
 Počítač musí mít Windows 11 a procesor Intel nebo AMD x64. Telefon může být Android nebo iPhone. Potřebuje funkční SIM, možnost odchozích hovorů a Bluetooth spojení s počítačem.
 
@@ -15,7 +17,7 @@ Na Androidu povolte u spárovaného počítače telefonní hovory. Při párová
 ## Instalace
 
 ```powershell
-git clone --branch codex-czech-setup --single-branch https://github.com/HoppeStudios/pat-phone-agent-tool.git
+git clone --branch android-sip-tailscale --single-branch https://github.com/HoppeStudios/pat-phone-agent-tool.git
 cd pat-phone-agent-tool
 powershell -File .\setup-codex.ps1
 powershell -File .\scripts\Install-PhoneHelper.ps1 -EnableDeveloperMode -EnableMobileAccess
@@ -27,9 +29,13 @@ Spusťte `.venv\Scripts\pythonw.exe .\note.py`, vyplňte jméno, oblast a časov
 
 ## Wi-Fi a Tailscale
 
-Tato verze potřebuje Bluetooth pro zvuk skutečného hovoru přes SIM. Wi-Fi ani Tailscale samy nezpřístupní zvuk telefonního hovoru běžné aplikaci na Androidu. Síťové ovládání telefonu a přenos zvuku oběma směry jsou různé věci. Připojení přes ADB není důkaz funkční hlasové brány.
+Nový experimentální adaptér používá Voice SIP Agent 0.4.2, Shizuku 13.6.0, Tailscale na obou zařízeních a Asterisk 22.12.0 ve WSL. USB slouží k úvodní instalaci a spuštění Shizuku; zvuk má potom procházet sítí. Tento režim nepotřebuje Windows Bluetooth helper, Režim pro vývojáře ani virtuální zvuková zařízení.
 
-Existuje [experimentální úprava scrcpy](https://github.com/Genymobile/scrcpy/pull/7004) pro přenos mikrofonu z počítače do Androidu. Vyžaduje Android 13 nebo novější a zvláštní sestavení klienta. Cílí na VoIP a její funkce závisí na konkrétním telefonu. Není součástí tohoto forku. Podpora skutečného hovoru přes SIM se musí ověřit na daném zařízení v obou směrech.
+Uživatel musí potvrdit instalaci APK, autorizaci USB a oprávnění Shizuku. Hlavní bránu zapněte jen s jeho souhlasem. Příchozí hovory pro oba sloty zůstávají vypnuté, výchozí SIM má hodnotu Refuse a konkrétní slot se předává v každém požadovaném hovoru. Odchozí volání je v klientovi zpočátku vypnuté.
+
+Na Androidu 13 je ověřené oprávnění, registrace SIP přes Tailscale a místní zvuková smyčka. Skutečný zvuk přes SIM v obou směrech a zobrazené číslo zatím vyžadují první hovor na vlastní druhý telefon nebo souhlasícího příjemce. Síťový adaptér nepodporuje příchozí hovory ani převzetí hovoru uživatelem. Po restartu telefonu může být nutné Shizuku znovu spustit.
+
+Podrobný postup, přesné hashe a omezení jsou v [Android SIP návodu](ANDROID_SIP.md).
 
 ## Cena a ověření
 
