@@ -11,5 +11,29 @@
     "url": "https://download.vb-audio.com/Download_CABLE/VoicemeeterSetup_v1130.zip",
     "sha256": "75e797b24dd851f487c733f83cdab49f26aaa3d828da054b7ab31b56a1165acf",
     "publisher": "BUREL VINCENT Entrepreneur individuel"
+  },
+  "androidSip": {
+    "asterisk": {
+      "version": "22.12.0",
+      "url": "https://downloads.asterisk.org/pub/telephony/asterisk/asterisk-22.12.0.tar.gz",
+      "sha256": "f8b2ba98aac6c4ff3376bc0a2868bea6ed577ca684efb7ec739ae6e8ce6e35e2",
+      "license": "GPL-2.0"
+    },
+    "voiceSipAgent": {
+      "version": "0.4.2",
+      "sourceCommit": "5105a1f447ffa25ba32d0620dbeef44bbc1705ce",
+      "url": "https://github.com/sparkcyf/android-voice-sip-agent/releases/download/v0.4.2/voice-sip-agent-0.4.2.apk",
+      "sha256": "af6fd8002f0ff284f1bf453c343ce43b89016e8a7034b5142e34732dce499993",
+      "signerSha256": "b8fe38aa02f9657c6785fb6faeb20abb20deba410f9c643fcd93269b642850c4",
+      "license": "GPL-2.0"
+    },
+    "shizuku": {
+      "version": "13.6.0",
+      "sourceCommit": "2650830c5b099ae0dd34fedf614d4f592ca05d65",
+      "url": "https://github.com/RikkaApps/Shizuku/releases/download/v13.6.0/shizuku-v13.6.0.r1086.2650830c-release.apk",
+      "sha256": "6e273ab0e991c4e79bc8b1bbb9b9dd739ccac1a8712a541a214078886b7b790f",
+      "observedSignerSha256": "268b5590e868fb08bae7e0ac413564cd1ff88f5ccff74af9dbd0dc918e30db30",
+      "license": "Apache-2.0"
+    }
   }
 }

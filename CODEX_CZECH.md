@@ -26,7 +26,7 @@ An optional `assistant_name` in the local user profile changes the assistant's i
 
 Python wheels are pinned in requirements.lock. Microsoft SDK and optional Voicemeeter versions are pinned in installation-manifest.json. The helper includes its own runtime and is registered as a Windows development package. Developer Mode and mobile-device access are explicit requirements, with their scopes described in docs/INSTALLATION.md.
 
-Calls use a Bluetooth hands free connection to the phone's SIM. Wi-Fi, ADB and Tailscale do not provide an alternative call-audio bridge in this implementation. A connected network device is not a verified phone line.
+The original transport uses a Bluetooth hands free connection to the phone's SIM. The experimental [Android SIP transport](docs/ANDROID_SIP.md) uses a separate Shizuku-enabled gateway over Tailscale and a local Asterisk/AudioSocket backend. It is outgoing-only, with incoming answering and handover disabled. Registration, permission preflight and local echo are verified separately from live cellular audio; a connected network device is not a verified completed telephone call.
 
 No live telephone test is part of the default test suite or CI. Synthetic audio, a Codex text reply, a connected line and a completed call are different evidence and must be reported separately.
 

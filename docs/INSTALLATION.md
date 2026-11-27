@@ -1,6 +1,8 @@
 # Installation and first call
 
-## Requirements
+Choose [Android over Tailscale](ANDROID_SIP.md) for the experimental network gateway, or follow the Bluetooth path below. SIP does not need the Windows Bluetooth helper, Developer Mode, mobile-device access or virtual audio drivers.
+
+## Bluetooth requirements
 
 | Requirement | Why it is needed |
 | --- | --- |
@@ -22,12 +24,12 @@ This fork is free software under Apache 2.0. It does not need Twilio, Vapi or a 
 
 Voicemeeter's standard functions are available under its donationware model. Optional paid features are not needed by this setup. No installer should purchase a license or change a service plan automatically.
 
-## Get the Codex branch
+## Get the Android SIP review branch
 
-Until the Codex pull request is merged, use the review branch explicitly:
+The Codex/Czech foundation is merged in `main`. The new Android SIP adapter is on this separate review branch until its PR is merged:
 
 ```powershell
-git clone --branch codex-czech-setup --single-branch https://github.com/HoppeStudios/pat-phone-agent-tool.git
+git clone --branch android-sip-tailscale --single-branch https://github.com/HoppeStudios/pat-phone-agent-tool.git
 cd pat-phone-agent-tool
 ```
 
@@ -81,13 +83,9 @@ This fork refuses pairing while Phone Link is running. It does not kill Phone Li
 
 ## Wi-Fi and Tailscale
 
-Wi-Fi and Tailscale do not replace the Bluetooth call-audio path in this fork. Tailscale can carry authenticated network traffic, but it does not grant access to Android's cellular call audio. Ordinary Android apps cannot capture the voice-call uplink and downlink using the privileged CAPTURE_AUDIO_OUTPUT permission. See [Android's audio-input rules](https://developer.android.com/media/platform/sharing-audio-input).
+The fork now includes an experimental outgoing-only Android SIP adapter. Read [Android SIM over Tailscale](ANDROID_SIP.md) for pinned helper downloads, Shizuku/USB permissions, the WSL backend, network scope, private configuration and startup. USB/ADB access or SIP registration alone is not proof of bidirectional cellular audio. Incoming answering and owner handover are unavailable on this route.
 
-Remote command control and bidirectional SIM-call audio are separate requirements. An ADB connection or an online Tailscale peer alone is not a working voice gateway. Do not document either as proof of calling support.
-
-There is experimental work on [scrcpy client audio injection](https://github.com/Genymobile/scrcpy/pull/7004). It targets VoIP, requires Android 13 or newer and a special client build, and its author warns that audio-policy behavior varies by device. Separate [reports for Android 16](https://github.com/Genymobile/scrcpy/issues/3880) describe call-audio injection, but this is not established SIM-call support for every phone. It is not integrated into this fork. A future network backend must verify receiving call audio, injecting the assistant's voice into the cellular uplink, call control and cleanup on the actual device before claiming compatibility.
-
-A network-only implementation would need a separately verified device-specific privileged gateway, suitable external telephony hardware, or a supported VoIP carrier arrangement. Those are not implemented here. They may need extra hardware, fees or system changes. This installer does not root a phone, unlock its bootloader, purchase a service or promise free carrier calls.
+The Bluetooth instructions above remain the iPhone path. Do not install a second transport's drivers or enable unrelated settings when using SIP.
 
 ## Checks before calling
 
